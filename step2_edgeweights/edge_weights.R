@@ -247,7 +247,7 @@ plot_network_threshold(edge_samples = edge_samples,
                        lwd = 15)
 
 ### clean workspace
-rm(counts_ls, x, i, j) ; gc()
+rm(counts_ls, x, i) ; gc()
 
 ### save image
 save.image('step2_edgeweights/workspace_images/edgeweights_fitted_1973.RData')
