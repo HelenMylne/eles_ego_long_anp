@@ -4,6 +4,8 @@
 #### set up ####
 library(tidyverse)
 
+pdf('../outputs/data_processing.pdf')
+
 #### identify individuals of interest ####
 ## import data
 ate <- read_csv('../../data_processed/step1_dataprocessing/anp_sightings_rawcombined.csv')
@@ -103,6 +105,13 @@ elephants_ego <- elephants_ego %>%
          first_sighting = ifelse(first_sighting == 7, 8, first_sighting)) %>% 
   relocate(year, .after = dyr)
 
+## filter down to only years where elephant was alive
+elephants_ego <- elephants_ego %>%
+  mutate(dyr = ifelse(dyr == -1, 2999, dyr)) %>% 
+  filter(year >= byr & year <= dyr) %>% 
+  filter(year > 1972) %>% 
+  filter(year < 2023)
+
 #### create data frames per elephant ####
 for(i in 1:length(selected)){
   # extract data per elephant
@@ -110,10 +119,14 @@ for(i in 1:length(selected)){
     filter(id == selected[i])
   
   # calculate year to start extracting observations
+  if(! elephant_of_interest$first_sighting[1] %in% elephant_of_interest$age){
+    elephant_of_interest$first_sighting <- elephant_of_interest$age[which(
+      elephant_of_interest$year_sightings > 0)[1]]
+  }
   age_first_sighting <- elephant_of_interest$first_sighting[1]
-  if(age_first_sighting %% 2 != 0){
-    age_first_sighting <- age_first_sighting + 1
-  } 
+  # if(age_first_sighting %% 2 != 0){
+  #   age_first_sighting <- age_first_sighting + 1
+  # } 
   elephant_of_interest$start_yr <- elephant_of_interest$year[elephant_of_interest$age == age_first_sighting]
   
   # calculate year to stop extracting observations
@@ -132,10 +145,10 @@ for(i in 1:length(selected)){
   sightings <- ate %>% 
     filter(year >= elephant_of_interest$start_yr[1]) %>% 
     filter(year <= elephant_of_interest$end_yr[1])
-  saveRDS(sightings, file = paste0('../data_processed/males/sightings_',selected[i],'.RDS'))
+  saveRDS(sightings, file = paste0('../data_processed/step1_dataprocessing/males/sightings_',selected[i],'.RDS'))
 }
 
-write_csv(elephants_ego, '../data_processed/males/selected_elephants.csv')
+write_csv(elephants_ego, '../data_processed/step1_dataprocessing/males/selected_elephants.csv')
 
 rm(elephant_of_interest, sightings, age_first_sighting, age_last_sighting, i) ; gc()
 save.image('data_processing.RData')
@@ -143,8 +156,8 @@ save.image('data_processing.RData')
 #### convert data frames to gbi matrix ####
 rm(list = ls() [! ls() %in% c('selected', 'observed')])
 for(i in 1:length(selected)){
-  ## import sightings data
-  s <- readRDS(file = paste0('../data_processed/sightings_',selected[i],'.RDS')) %>% 
+  ## import sightings data -- ALL SIGHTINGS OF MALE ELEPHANTS IN AMBOSELI FROM YEAR ELEPHANT IN QUESTION WAS FIRST OBSERVED THROUGH TO LAST
+  s <- readRDS(file = paste0('../data_processed/step1_dataprocessing/males/sightings_',selected[i],'.RDS')) %>% 
     mutate(obs_id_std = as.integer(as.factor(obs_id)))
   asnipe <- s %>% 
     select(id, obs_id_std) %>% 
@@ -153,7 +166,7 @@ for(i in 1:length(selected)){
   gbi_matrix <- spatsoc::get_gbi(DT = asnipe, group = 'group', id = 'ID')
   
   ## save output
-  saveRDS(gbi_matrix, file = paste0('../data_processed/males/gbimatrix_',selected[i],'.RDS'))
+  saveRDS(gbi_matrix, file = paste0('../data_processed/step1_dataprocessing/males/gbimatrix_',selected[i],'.RDS'))
   
   ## progress report
   print(paste0('gbi_matrix for ', selected[i],' created at ', Sys.time()))
@@ -234,6 +247,8 @@ for(year_id in start_years){
   
   ## remove dyads where one or other pair has not been born yet or has already died ----
   dyads_alive <- dyads_split %>% 
+    mutate(dyr_1 = ifelse(dyr_1 == -1, 2999, dyr_1),
+           dyr_2 = ifelse(dyr_2 == -1, 2999, dyr_2)) %>% 
     filter(byr_1 < year_id) %>% filter(dyr_1 > (year_id+1)) %>% 
     filter(byr_2 < year_id) %>% filter(dyr_2 > (year_id+1))
   
@@ -279,3 +294,6 @@ for(year_id in start_years){
   ## clean environment ----
   rm(list = ls()[! ls() %in% c('all_df_needed','ate','elephants_ego','nodes','selected','start_years','year_id')])
 }
+
+save.image('data_processing.RData')
+dev.off()
